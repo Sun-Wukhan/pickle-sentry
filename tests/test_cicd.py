@@ -25,6 +25,8 @@ def test_cicd_examples_call_the_released_package_or_action():
         "examples/cicd/gitlab-ci.yml": 'pickle-sentry==0.2.0',
         "examples/cicd/azure-pipelines.yml": 'pickle-sentry==0.2.0',
         "examples/cicd/Jenkinsfile": 'pickle-sentry==0.2.0',
+        "examples/cicd/github-actions-scan-existing-package.yml": "datasets==5.1.0",
+        "examples/cicd/scan-existing-package.sh": "pip download --no-deps",
     }
 
     for relative_path, needle in expected.items():
@@ -38,3 +40,13 @@ def test_cicd_document_explains_exit_code_contract():
     assert "No finding reached the selected `--fail-on` threshold" in guide
     assert "At least one finding reached the selected `--fail-on` threshold" in guide
     assert 'pickle-sentry==0.2.0' in guide
+
+
+def test_existing_package_example_records_the_real_datasets_result():
+    example = read("docs/EXISTING-PACKAGE-EXAMPLE.md")
+
+    assert "datasets==5.1.0" in example
+    assert "154" in example
+    assert "PANDAS-READ-PICKLE" in example
+    assert "pandas.py:56" in example
+    assert "Pipeline exit code | 1" in example

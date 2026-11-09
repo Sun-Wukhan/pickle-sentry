@@ -129,7 +129,10 @@ Exit `0` means no finding reached the threshold; exit `1` fails the job;
 exit `2` means the scan itself could not run. Full examples — including SARIF
 upload to GitHub code scanning and Hub scans in a pipeline — are in
 [docs/CI-CD.md](docs/CI-CD.md), with copy-ready files under
-[examples/cicd](examples/cicd).
+[examples/cicd](examples/cicd). A worked supply-chain example scans the
+existing `datasets==5.1.0` wheel without installing it and fails on the real
+CVE sink at `pandas.py:56`:
+[docs/EXISTING-PACKAGE-EXAMPLE.md](docs/EXISTING-PACKAGE-EXAMPLE.md).
 
 ## Demo
 

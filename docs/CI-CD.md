@@ -22,6 +22,27 @@ python -m pip install "pickle-sentry==0.2.0"
 pickle-sentry . --fail-on high
 ```
 
+## Worked example — scan an existing package
+
+To scan a third-party package before it is installed or promoted, download
+its archive without installing it, extract it, and scan the extracted source:
+
+```bash
+python -m pip install "pickle-sentry==0.2.0"
+python -m pip download --no-deps --dest package "datasets==5.1.0"
+python -m zipfile -e package/datasets-5.1.0-py3-none-any.whl extracted
+pickle-sentry extracted --format json \
+  --output pickle-sentry-report.json --fail-on high
+```
+
+Verified result for `datasets==5.1.0`: 154 Python files scanned, exactly one
+finding — `PANDAS-READ-PICKLE` at
+`datasets/packaged_modules/pandas/pandas.py:56` — and exit code `1`, so the
+pipeline gate fails. Full walkthrough:
+[docs/EXISTING-PACKAGE-EXAMPLE.md](EXISTING-PACKAGE-EXAMPLE.md). Copy-ready
+files are `examples/cicd/github-actions-scan-existing-package.yml` and
+`examples/cicd/scan-existing-package.sh`.
+
 ## GitHub Actions — use the supplied Action
 
 Add this as `.github/workflows/pickle-sentry.yml` in the repository you want to

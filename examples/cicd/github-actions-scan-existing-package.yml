@@ -1,0 +1,70 @@
+name: Scan an existing package with pickle-sentry
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_spec:
+        description: Existing package to download and scan
+        required: true
+        default: "datasets==5.1.0"
+      fail_on:
+        description: Severity threshold for the pipeline gate
+        required: true
+        type: choice
+        options: [critical, high, medium, low, none]
+        default: high
+
+permissions:
+  contents: read
+
+jobs:
+  scan-existing-package:
+    runs-on: ubuntu-latest
+    env:
+      PACKAGE_SPEC: ${{ inputs.package_spec }}
+      FAIL_ON: ${{ inputs.fail_on }}
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pickle-sentry
+        run: python -m pip install "pickle-sentry==0.2.0"
+
+      - name: Download the existing package without installing it
+        run: python -m pip download --no-deps --dest package "${PACKAGE_SPEC}"
+
+      - name: Extract the package
+        shell: bash
+        run: |
+          mkdir -p extracted
+          for archive in package/*; do
+            case "${archive}" in
+              *.whl|*.zip)
+                python -m zipfile -e "${archive}" extracted
+                ;;
+              *.tar.gz)
+                tar -xzf "${archive}" -C extracted
+                ;;
+              *)
+                echo "Unsupported package archive: ${archive}" >&2
+                exit 2
+                ;;
+            esac
+          done
+
+      - name: Scan the extracted package
+        run: >-
+          pickle-sentry extracted
+          --format json
+          --output pickle-sentry-report.json
+          --fail-on "${FAIL_ON}"
+
+      - name: Upload the scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pickle-sentry-report
+          path: pickle-sentry-report.json
+          if-no-files-found: warn
