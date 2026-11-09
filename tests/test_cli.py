@@ -33,6 +33,22 @@ def test_cli_exit_codes_and_json(tmp_path, capsys):
     assert main([str(tmp_path), "--format", "json"]) == 0
 
 
+def test_cli_report_only_mode_writes_sarif(tmp_path):
+    bad = tmp_path / "bad.py"
+    bad.write_text('from datasets import load_dataset\nload_dataset("pandas", data_files="x.pkl")\n')
+    report = tmp_path / "pickle-sentry.sarif"
+
+    assert main([
+        str(tmp_path),
+        "--format", "sarif",
+        "--output", str(report),
+        "--fail-on", "none",
+    ]) == 0
+    data = json.loads(report.read_text())
+    assert data["version"] == "2.1.0"
+    assert data["runs"][0]["results"][0]["ruleId"] == "HF-DATASETS-PANDAS-BUILDER"
+
+
 def test_cli_inspects_pickle_files(tmp_path):
     class Evil:
         def __reduce__(self):

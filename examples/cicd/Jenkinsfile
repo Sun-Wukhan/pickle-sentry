@@ -1,0 +1,19 @@
+pipeline {
+  agent any
+
+  stages {
+    stage('pickle-sentry') {
+      steps {
+        sh '''
+          python3 -m pip install "pickle-sentry==0.2.0"
+          pickle-sentry . --fail-on high --format json --output pickle-sentry.json
+        '''
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: 'pickle-sentry.json', allowEmptyArchive: true
+        }
+      }
+    }
+  }
+}

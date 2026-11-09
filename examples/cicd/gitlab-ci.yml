@@ -1,0 +1,9 @@
+pickle-sentry:
+  image: python:3.12-slim
+  script:
+    - python -m pip install "pickle-sentry==0.2.0"
+    - pickle-sentry . --fail-on high --format json --output pickle-sentry.json
+  artifacts:
+    when: always
+    paths:
+      - pickle-sentry.json

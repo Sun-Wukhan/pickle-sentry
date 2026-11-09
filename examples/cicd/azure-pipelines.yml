@@ -1,0 +1,15 @@
+trigger:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.12"
+
+  - script: |
+      python -m pip install "pickle-sentry==0.2.0"
+      pickle-sentry . --fail-on high
+    displayName: "Run pickle-sentry"

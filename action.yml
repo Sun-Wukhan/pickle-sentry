@@ -1,8 +1,12 @@
 name: pickle-sentry
 description: Scan for unsafe pickle deserialization, including the Hugging Face datasets pandas builder RCE (CVE-2026-57845).
+author: Navid Khan
+branding:
+  icon: shield
+  color: red
 inputs:
   path:
-    description: Path to scan
+    description: File or directory to scan
     required: false
     default: "."
   fail-on:
@@ -13,13 +17,54 @@ inputs:
     description: "Report format: text, json, or sarif"
     required: false
     default: "text"
+  output:
+    description: Optional file path for the report. Parent directories must already exist.
+    required: false
+    default: ""
+  exclude:
+    description: "Comma-separated path substrings to skip, for example: /tests/,/fixtures/"
+    required: false
+    default: ""
+  version:
+    description: pickle-sentry version to install from PyPI
+    required: false
+    default: "0.2.0"
+  python-version:
+    description: Python version used to run pickle-sentry
+    required: false
+    default: "3.12"
 runs:
   using: composite
   steps:
     - uses: actions/setup-python@v5
       with:
-        python-version: "3.12"
-    - shell: bash
-      run: pip install git+https://github.com/Sun-Wukhan/pickle-sentry.git
-    - shell: bash
-      run: pickle-sentry "${{ inputs.path }}" --format "${{ inputs.format }}" --fail-on "${{ inputs.fail-on }}"
+        python-version: ${{ inputs.python-version }}
+    - name: Install pickle-sentry from PyPI
+      shell: bash
+      env:
+        PICKLE_SENTRY_VERSION: ${{ inputs.version }}
+      run: python -m pip install "pickle-sentry==${PICKLE_SENTRY_VERSION}"
+    - name: Run pickle-sentry
+      shell: bash
+      env:
+        PICKLE_SENTRY_PATH: ${{ inputs.path }}
+        PICKLE_SENTRY_FORMAT: ${{ inputs.format }}
+        PICKLE_SENTRY_FAIL_ON: ${{ inputs.fail-on }}
+        PICKLE_SENTRY_OUTPUT: ${{ inputs.output }}
+        PICKLE_SENTRY_EXCLUDE: ${{ inputs.exclude }}
+      run: |
+        args=("${PICKLE_SENTRY_PATH}" --format "${PICKLE_SENTRY_FORMAT}" --fail-on "${PICKLE_SENTRY_FAIL_ON}")
+        if [[ -n "${PICKLE_SENTRY_OUTPUT}" ]]; then
+          args+=(--output "${PICKLE_SENTRY_OUTPUT}")
+        fi
+        if [[ -n "${PICKLE_SENTRY_EXCLUDE}" ]]; then
+          IFS=',' read -ra exclusions <<< "${PICKLE_SENTRY_EXCLUDE}"
+          for exclusion in "${exclusions[@]}"; do
+            exclusion="${exclusion#"${exclusion%%[![:space:]]*}"}"
+            exclusion="${exclusion%"${exclusion##*[![:space:]]}"}"
+            if [[ -n "${exclusion}" ]]; then
+              args+=(--exclude "${exclusion}")
+            fi
+          done
+        fi
+        pickle-sentry "${args[@]}"

@@ -22,7 +22,13 @@ load pickle-backed data, and migrate to Parquet / CSV / JSON / Arrow.
 ## Install
 
 ```bash
-pip install -e .
+pip install pickle-sentry
+```
+
+For reproducible CI installs, pin the release:
+
+```bash
+pip install "pickle-sentry==0.2.0"
 ```
 
 Zero dependencies. Python 3.9+.
@@ -99,6 +105,31 @@ honest limits in [docs/LIVE-EXAMPLES.md](docs/LIVE-EXAMPLES.md):
 Also included: a composite **GitHub Action** (`action.yml`, use it as
 `uses: Sun-Wukhan/pickle-sentry@main`) and a **pre-commit hook**
 (`.pre-commit-hooks.yaml`). Use `--exclude /tests/` to cut test-fixture noise.
+
+## CI/CD
+
+Call pickle-sentry as a pipeline gate in GitHub Actions, GitLab CI, Azure
+Pipelines, Jenkins, or any runner with Python 3.9+:
+
+```yaml
+- uses: Sun-Wukhan/pickle-sentry@main
+  with:
+    path: .
+    fail-on: high
+```
+
+Or call the PyPI package directly:
+
+```bash
+python -m pip install "pickle-sentry==0.2.0"
+pickle-sentry . --fail-on high
+```
+
+Exit `0` means no finding reached the threshold; exit `1` fails the job;
+exit `2` means the scan itself could not run. Full examples — including SARIF
+upload to GitHub code scanning and Hub scans in a pipeline — are in
+[docs/CI-CD.md](docs/CI-CD.md), with copy-ready files under
+[examples/cicd](examples/cicd).
 
 ## Demo
 
