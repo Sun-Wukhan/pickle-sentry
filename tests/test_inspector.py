@@ -57,3 +57,17 @@ def test_eval_payload_flagged():
             return (eval, ("1+1",))
     findings = inspect_pickle_bytes(pickle.dumps(Eval()), "e.pkl")
     assert any(f.severity == "critical" for f in findings)
+
+
+def _marker_writer():
+    return {"rows": []}
+
+
+def test_custom_callable_reduce_is_high():
+    # The CVE PoC's shape: REDUCE invoking a project-local function.
+    class MarkerPayload:
+        def __reduce__(self):
+            return (_marker_writer, ())
+    findings = inspect_pickle_bytes(pickle.dumps(MarkerPayload()), "poc.pkl")
+    assert any(f.rule_id == "PICKLE-REDUCE-CALLABLE" and f.severity == "high"
+               for f in findings)

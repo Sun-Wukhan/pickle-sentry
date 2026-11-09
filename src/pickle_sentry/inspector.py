@@ -31,6 +31,14 @@ DANGEROUS_GLOBALS = {
 DANGEROUS_MODULES = {"os", "posix", "nt", "subprocess", "pty", "commands",
                       "socket", "shutil", "runpy", "ctypes"}
 
+# Globals routinely used to reconstruct ordinary data (DataFrames, tensors,
+# datetimes). A REDUCE invoking only these is normal pickle mechanics.
+BENIGN_GLOBAL_PREFIXES = (
+    "collections.", "copyreg.", "builtins.object", "__builtin__.object",
+    "numpy.", "pandas.", "pyarrow.", "torch.", "datetime.", "dateutil.",
+    "decimal.", "uuid.", "re.", "codecs.", "typing.", "enum.",
+)
+
 
 def _globals_from_ops(data: bytes) -> tuple[list[str], bool]:
     """Return (global names referenced, whether a REDUCE opcode is present)."""
@@ -112,6 +120,23 @@ def inspect_pickle_bytes(data: bytes, path: str) -> list[Finding]:
             path=path, line=None,
             message=f"Pickle references OS/subprocess-level module globals: {', '.join(dangerous_mods)}.",
             evidence=", ".join(dangerous_mods),
+        ))
+
+    # Any other callable invoked via REDUCE: the pickle runs *someone's* function
+    # on load — e.g. the CVE PoC's __main__._write_marker_and_return_dataframe.
+    unknown_callables = sorted({g for g in globals_found
+                                if g not in dangerous
+                                and not g.startswith(BENIGN_GLOBAL_PREFIXES)})
+    if has_reduce and unknown_callables and not dangerous:
+        findings.append(Finding(
+            rule_id="PICKLE-REDUCE-CALLABLE",
+            severity="high",
+            path=path, line=None,
+            message=("Pickle invokes non-standard callable(s) via REDUCE "
+                     f"({', '.join(unknown_callables)}). Loading it runs that code — "
+                     "this is the shape of the CVE-2026-57845 PoC payload."),
+            evidence=", ".join(unknown_callables),
+            cve="CVE-2026-57845",
         ))
 
     if not findings:

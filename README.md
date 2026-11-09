@@ -71,8 +71,18 @@ Nothing downloaded is ever executed.
 | Rule | Severity | What |
 |---|---|---|
 | `PICKLE-DANGEROUS-REDUCE` | critical | Pickle calls `os.system`, `subprocess.*`, `eval`, `exec`, etc. via `REDUCE` |
+| `PICKLE-REDUCE-CALLABLE` | high | Pickle invokes a non-standard callable via `REDUCE` (the CVE PoC payload's shape) |
 | `PICKLE-DANGEROUS-GLOBAL` / `PICKLE-SUSPICIOUS-MODULE` | high/medium | Dangerous globals referenced without a reduce |
 | `PICKLE-FILE-PRESENT` | medium | Any other `.pkl` / `.pickle` / `.joblib` file, and pickle streams inside torch `.pt`/`.pth` zip archives |
+
+## Real-life use case
+
+[docs/USE-CASE.md](docs/USE-CASE.md) walks through a real one end to end:
+scanning the **actual published CVE-2026-57845 PoC repository** before
+touching it. pickle-sentry flags the vulnerable loader (`run_poc.py:139`,
+critical) and disassembles the live payload (`attacker-controlled.pkl`,
+high) — and the PoC's own `marker.txt` proves the payload never executed
+during the scan.
 
 ## Live examples
 
