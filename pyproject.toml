@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pickle-sentry"
+version = "0.1.0"
+description = "Scan code and dataset files for unsafe pickle deserialization — including the Hugging Face datasets pandas builder RCE (CVE-2026-57845). Never executes the files it inspects."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Navid Khan" }]
+keywords = ["security", "pickle", "deserialization", "huggingface", "cve-2026-57845", "scanner"]
+dependencies = []
+
+[project.scripts]
+pickle-sentry = "pickle_sentry.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

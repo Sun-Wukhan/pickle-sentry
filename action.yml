@@ -1,0 +1,25 @@
+name: pickle-sentry
+description: Scan for unsafe pickle deserialization, including the Hugging Face datasets pandas builder RCE (CVE-2026-57845).
+inputs:
+  path:
+    description: Path to scan
+    required: false
+    default: "."
+  fail-on:
+    description: "Severity threshold that fails the job: critical, high, medium, low, none"
+    required: false
+    default: "high"
+  format:
+    description: "Report format: text, json, or sarif"
+    required: false
+    default: "text"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - shell: bash
+      run: pip install git+https://github.com/Sun-Wukhan/pickle-sentry.git
+    - shell: bash
+      run: pickle-sentry "${{ inputs.path }}" --format "${{ inputs.format }}" --fail-on "${{ inputs.fail-on }}"

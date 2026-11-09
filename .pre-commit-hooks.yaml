@@ -1,0 +1,8 @@
+- id: pickle-sentry
+  name: pickle-sentry
+  description: Scan for unsafe pickle deserialization (incl. CVE-2026-57845)
+  entry: pickle-sentry
+  language: python
+  types: [python]
+  pass_filenames: true
+  args: ["--fail-on", "high"]
