@@ -34,7 +34,23 @@ pickle-sentry scan-path/                     # text report, exit 1 on high+
 pickle-sentry . --format json --output report.json
 pickle-sentry . --format sarif --output report.sarif   # for GitHub code scanning
 pickle-sentry . --fail-on critical           # CI: only fail on critical
+pickle-sentry . --exclude /tests/            # production surface only
 ```
+
+### Scan a Hugging Face Hub repo (new in 0.2.0)
+
+```bash
+pickle-sentry hub stanfordnlp/imdb                          # a dataset
+pickle-sentry hub hf-internal-testing/tiny-random-bert --repo-type model
+pickle-sentry hub user/repo --max-size-mb 16 --format json
+```
+
+Lists the repo's files via the Hub API, downloads pickle-family files
+(`.pkl`, `.pickle`, `.joblib`, `.pt`, `.pth`, and classic `pytorch_model.bin`)
+and inspects them by disassembly — including the pickle stream inside torch
+zip archives — and AST-scans any Python files in the repo. Files over the
+size cap are flagged, not downloaded. Set `HF_TOKEN` for private repos.
+Nothing downloaded is ever executed.
 
 ## What it catches
 

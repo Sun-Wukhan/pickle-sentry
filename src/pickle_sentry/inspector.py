@@ -63,6 +63,21 @@ def _globals_from_ops(data: bytes) -> tuple[list[str], bool]:
 
 
 def inspect_pickle_bytes(data: bytes, path: str) -> list[Finding]:
+    # Torch checkpoints / model .bin files are zip archives holding a pickle stream.
+    if data[:2] == b"PK":
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                inner: list[Finding] = []
+                for name in zf.namelist():
+                    if name.endswith("data.pkl") or name.endswith(".pkl"):
+                        inner.extend(inspect_pickle_bytes(zf.read(name), f"{path}!{name}"))
+                if inner:
+                    return inner
+        except zipfile.BadZipFile:
+            pass
+        return [Finding("PICKLE-FILE-PRESENT", "medium", path, None,
+                        "Zip-based checkpoint present; no pickle stream could be parsed. "
+                        "Treat as untrusted code-bearing data until verified.")]
     findings: list[Finding] = []
     globals_found, has_reduce = _globals_from_ops(data)
     dangerous = sorted({g for g in globals_found if g in DANGEROUS_GLOBALS})

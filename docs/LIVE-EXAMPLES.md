@@ -74,6 +74,31 @@ open("benign.pkl", "wb").write(pickle.dumps({"rows": [1, 2, 3]}))
 
 The canary file is never created: inspection is disassembly only.
 
+## 4. Hub mode, live (added in 0.2.0)
+
+```bash
+pickle-sentry hub hf-internal-testing/tiny-random-bert --repo-type model
+```
+
+Inspected the model's `pytorch_model.bin` — a zip archive — and disassembled
+the pickle stream inside it:
+
+```
+[MEDIUM] PICKLE-FILE-PRESENT  hub://model/hf-internal-testing/tiny-random-bert@main/pytorch_model.bin!archive/data.pkl
+    Globals seen: collections.OrderedDict, torch.FloatStorage, torch.LongStorage,
+    torch._utils._rebuild_tensor_v2
+```
+
+Correct triage: those globals are ordinary torch storage rebuilds, so this is
+a presence warning, not a critical. A `REDUCE` to `os.system` in the same
+position is flagged critical (see the test suite).
+
+```bash
+pickle-sentry hub stanfordnlp/imdb
+```
+
+Parquet-era dataset: 0 pickle files, 0 Python scripts, no findings.
+
 ## Honest limits
 
 - This is a *finder*, not a proof of exploitability. Context decides: a

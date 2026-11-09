@@ -34,7 +34,7 @@ def to_json(result: ScanResult) -> str:
 
 def to_sarif(result: ScanResult) -> str:
     runs = [{
-        "tool": {"driver": {"name": "pickle-sentry", "version": "0.1.0",
+        "tool": {"driver": {"name": "pickle-sentry", "version": "0.2.0",
                             "informationUri": "https://github.com/Sun-Wukhan/pickle-sentry"}},
         "results": [
             {
