@@ -1,5 +1,12 @@
 # pickle-sentry
 
+**The pickle scanner for your code and your supply chain — not just your model files.**
+
+[![CI](https://github.com/Sun-Wukhan/pickle-sentry/actions/workflows/ci.yml/badge.svg)](https://github.com/Sun-Wukhan/pickle-sentry/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/pickle-sentry)](https://pypi.org/project/pickle-sentry/)
+[![Python](https://img.shields.io/pypi/pyversions/pickle-sentry)](https://pypi.org/project/pickle-sentry/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Scan code and dataset files for unsafe pickle deserialization — including the
 Hugging Face `datasets` pandas builder RCE, **CVE-2026-57845** (CVSS 8.8).
 
@@ -8,6 +15,42 @@ a pickle loader executes whatever its author put in it. `pickle-sentry` finds
 those paths in your code, and inspects pickle files by *disassembly only* —
 **it never executes the files it inspects** (its test suite proves this with a
 canary payload).
+
+![pickle-sentry demo](docs/assets/demo.svg)
+
+Full walkthrough: [docs/DEMO.md](docs/DEMO.md).
+
+## Quick start
+
+```bash
+pip install pickle-sentry
+
+pickle-sentry .                                   # scan a project (code + pickle files)
+pickle-sentry hub user/repo --repo-type model     # scan a Hugging Face repo before loading it
+pickle-sentry . --fail-on high                    # as a CI gate: exit 1 on high+
+```
+
+Zero dependencies. Python 3.9+.
+
+## How it differs
+
+Most pickle scanners inspect **model files**. pickle-sentry also inspects the
+**code that loads pickles** and the **packages you are about to install** —
+the two places the CVE-2026-57845 class of bug actually lives.
+
+| Capability | pickle-sentry | Model-file scanners (Picklescan / ModelScan / Fickling) |
+|---|:---:|:---:|
+| Inspect pickle / PyTorch files without executing them | ✓ | ✓ |
+| Scan source code for unsafe loaders (`pickle.load`, `torch.load`, `read_pickle`, …) | ✓ | — |
+| Flag `load_dataset("pandas", ...)` as CVE-2026-57845 | ✓ | — |
+| Scan a Hugging Face Hub repo remotely | ✓ | partial (Picklescan) |
+| Scan a PyPI package *before* installing it | ✓ (pipeline pattern) | — |
+| Deep pickle decompilation / allowlist VM analysis | — | ✓ (Fickling) |
+| Many non-pickle model formats (Keras, TF, ONNX, …) | — | ✓ (ModelScan / ModelAudit) |
+| Zero dependencies, one-line CI gate, SARIF output | ✓ | varies |
+
+Use pickle-sentry alongside a model-file scanner, not instead of one: it
+covers the loader and supply-chain surface they do not.
 
 ## Why now
 
@@ -18,20 +61,6 @@ victim's privileges the moment the dataset loads. The upstream fix
 (huggingface/datasets#8879) disables the pandas builder, but no patched
 release exists yet. Until one ships, the mitigation is: find every place you
 load pickle-backed data, and migrate to Parquet / CSV / JSON / Arrow.
-
-## Install
-
-```bash
-pip install pickle-sentry
-```
-
-For reproducible CI installs, pin the release:
-
-```bash
-pip install "pickle-sentry==0.2.0"
-```
-
-Zero dependencies. Python 3.9+.
 
 ## Use
 
@@ -121,7 +150,7 @@ Pipelines, Jenkins, or any runner with Python 3.9+:
 Or call the PyPI package directly:
 
 ```bash
-python -m pip install "pickle-sentry==0.2.0"
+python -m pip install "pickle-sentry==0.2.1"
 pickle-sentry . --fail-on high
 ```
 

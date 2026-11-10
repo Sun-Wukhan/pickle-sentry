@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pickle-sentry"
-version = "0.2.0"
+version = "0.2.1"
 description = "Scan code and dataset files for unsafe pickle deserialization — including the Hugging Face datasets pandas builder RCE (CVE-2026-57845). Never executes the files it inspects."
 readme = "README.md"
 requires-python = ">=3.9"

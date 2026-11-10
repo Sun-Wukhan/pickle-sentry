@@ -20,7 +20,7 @@ Copy-ready GitHub Actions workflow:
 
 The workflow:
 
-1. Installs the released scanner: `pickle-sentry==0.2.0`.
+1. Installs the released scanner from PyPI (the recorded run used 0.2.0).
 2. Downloads the target without its dependencies and without installing it:
    `pip download --no-deps datasets==5.1.0`.
 3. Extracts the downloaded wheel.
