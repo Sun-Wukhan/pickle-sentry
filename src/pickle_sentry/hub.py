@@ -10,18 +10,23 @@ import os
 import urllib.request
 import urllib.error
 
-from .inspector import inspect_pickle_bytes
+from . import __version__
+from .inspector import inspect_bytes
 from .model import Finding, ScanResult
 from .scanner import scan_python_source
 
 PICKLE_EXTS = {".pkl", ".pickle", ".joblib", ".pt", ".pth"}
+# Model-artifact formats inspected remotely. .safetensors is deliberately
+# excluded: those files are usually far too large to download for a header
+# check, and the format is data-only by design (inspect it locally instead).
+ARTIFACT_EXTS = {".npy", ".npz", ".keras", ".gguf"}
 # Model weights in classic PyTorch format are pickle zip archives.
 MODEL_PICKLE_NAMES = {"pytorch_model.bin"}
 DEFAULT_MAX_BYTES = 64 * 1024 * 1024  # per file
 
 
 def _default_fetch(url: str) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": "pickle-sentry/0.2"})
+    req = urllib.request.Request(url, headers={"User-Agent": f"pickle-sentry/{__version__}"})
     token = os.environ.get("HF_TOKEN")
     if token:
         req.add_header("Authorization", f"Bearer {token}")
@@ -57,15 +62,17 @@ def scan_hub_repo(repo_id: str, repo_type: str = "dataset", revision: str = "mai
         name = sib.get("rfilename", "")
         ext = os.path.splitext(name)[1].lower()
         display = f"{result.root}/{name}"
-        is_pickle = ext in PICKLE_EXTS or os.path.basename(name) in MODEL_PICKLE_NAMES
+        is_pickle = (ext in PICKLE_EXTS or ext in ARTIFACT_EXTS
+                     or os.path.basename(name) in MODEL_PICKLE_NAMES)
         if is_pickle:
             result.pickle_files_inspected += 1
             size = sib.get("size")
             if size is not None and size > max_bytes:
                 result.findings.append(Finding(
                     "HUB-PICKLE-TOO-LARGE", "high", display, None,
-                    f"Pickle-family file of {size/1e6:.1f} MB exceeds the {max_bytes/1e6:.0f} MB "
-                    "inspection cap and was NOT downloaded. Inspect it locally before trusting it.",
+                    f"Pickle-family or model-artifact file of {size/1e6:.1f} MB exceeds the "
+                    f"{max_bytes/1e6:.0f} MB inspection cap and was NOT downloaded. "
+                    "Inspect it locally before trusting it.",
                     cve="CVE-2026-57845"))
                 continue
             try:
@@ -74,7 +81,7 @@ def scan_hub_repo(repo_id: str, repo_type: str = "dataset", revision: str = "mai
                 result.findings.append(Finding("HUB-DOWNLOAD-FAILED", "low", display, None,
                                                f"Could not download for inspection: {exc}"))
                 continue
-            result.findings.extend(inspect_pickle_bytes(data, display))
+            result.findings.extend(inspect_bytes(data, display))
         elif ext == ".py":
             result.files_scanned += 1
             try:

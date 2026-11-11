@@ -45,8 +45,9 @@ the two places the CVE-2026-57845 class of bug actually lives.
 | Flag `load_dataset("pandas", ...)` as CVE-2026-57845 | ✓ | — |
 | Scan a Hugging Face Hub repo remotely | ✓ | partial (Picklescan) |
 | Scan a PyPI package *before* installing it | ✓ (pipeline pattern) | — |
-| Deep pickle decompilation / allowlist VM analysis | — | ✓ (Fickling) |
-| Many non-pickle model formats (Keras, TF, ONNX, …) | — | ✓ (ModelScan / ModelAudit) |
+| Pickle VM analysis resolving which callables are *actually invoked* | ✓ (abstract interpretation over the disassembly, memo- and nesting-aware) | ✓ (Fickling) |
+| Decompile pickles back to readable Python source | — | ✓ (Fickling) |
+| Non-pickle model formats | partial (`.npy`/`.npz` object payloads, `.keras` Lambda layers, safetensors/GGUF headers) | ✓ (ModelScan / ModelAudit: Keras, TF, ONNX, …) |
 | Zero dependencies, one-line CI gate, SARIF output | ✓ | varies |
 
 Use pickle-sentry alongside a model-file scanner, not instead of one: it
@@ -82,10 +83,12 @@ pickle-sentry hub user/repo --max-size-mb 16 --format json
 
 Lists the repo's files via the Hub API, downloads pickle-family files
 (`.pkl`, `.pickle`, `.joblib`, `.pt`, `.pth`, and classic `pytorch_model.bin`)
-and inspects them by disassembly — including the pickle stream inside torch
-zip archives — and AST-scans any Python files in the repo. Files over the
-size cap are flagged, not downloaded. Set `HF_TOKEN` for private repos.
-Nothing downloaded is ever executed.
+and model artifacts (`.npy`, `.npz`, `.keras`, `.gguf`) and inspects them by
+disassembly — including the pickle stream inside torch zip archives — and
+AST-scans any Python files in the repo. Files over the size cap are flagged,
+not downloaded. `.safetensors` files are not downloaded in Hub mode (too
+large for a header check; scan them locally). Set `HF_TOKEN` for private
+repos. Nothing downloaded is ever executed.
 
 ## What it catches
 
@@ -101,14 +104,36 @@ Nothing downloaded is ever executed.
 | `YAML-UNSAFE-LOAD` | medium | `yaml.load(...)` without a SafeLoader |
 | `NUMPY-ALLOW-PICKLE` | high | `numpy.load(..., allow_pickle=True)` |
 
-**In data files (disassembly via `pickletools`, never unpickled):**
+**In data files (abstract interpretation over `pickletools` disassembly, never unpickled):**
+
+The inspector tracks a symbolic stack through the pickle VM, so it resolves
+which callables a stream *actually invokes* — through `REDUCE`, `NEWOBJ`,
+`INST`, the memo, and nested pickle streams embedded in bytes constants —
+instead of guessing from the globals a file merely mentions. Wrappers are
+peeled first: gzip / bzip2 / xz / zlib compression, and pickle-looking
+members of zip and tar archives.
 
 | Rule | Severity | What |
 |---|---|---|
-| `PICKLE-DANGEROUS-REDUCE` | critical | Pickle calls `os.system`, `subprocess.*`, `eval`, `exec`, etc. via `REDUCE` |
-| `PICKLE-REDUCE-CALLABLE` | high | Pickle invokes a non-standard callable via `REDUCE` (the CVE PoC payload's shape) |
-| `PICKLE-DANGEROUS-GLOBAL` / `PICKLE-SUSPICIOUS-MODULE` | high/medium | Dangerous globals referenced without a reduce |
+| `PICKLE-DANGEROUS-REDUCE` | critical | Pickle invokes `os.system`, `subprocess.*`, `eval`, `exec`, etc. via `REDUCE`/`NEWOBJ` |
+| `PICKLE-REDUCE-CALLABLE` | high | Pickle invokes a non-standard callable via `REDUCE`/`NEWOBJ` (the CVE PoC payload's shape) |
+| `PICKLE-DANGEROUS-GLOBAL` / `PICKLE-SUSPICIOUS-MODULE` | high/medium | Dangerous globals referenced but never invoked |
+| `PICKLE-CONTAINER-OPAQUE` | high | 7-Zip archive: contents cannot be inspected with the standard library (the NullifAI evasion route) — extract and scan the contents |
 | `PICKLE-FILE-PRESENT` | medium | Any other `.pkl` / `.pickle` / `.joblib` file, and pickle streams inside torch `.pt`/`.pth` zip archives |
+| `PICKLE-UNPARSEABLE` | medium | A stream that yields no valid pickle opcodes (corrupt, truncated, or not a pickle) |
+
+**In other model artifacts (new in 0.3.0):**
+
+| Rule | Severity | What |
+|---|---|---|
+| (pickle rules above) | as above | `.npy` object-array payloads and `.npz` members are pickle streams and are analysed as such; `.keras` archives get their `.pkl` members analysed too |
+| `KERAS-LAMBDA-LAYER` | high | Keras Lambda layer in `config.json` — loads marshalled Python bytecode at load time |
+| `NPY-DATA-ARRAY` / `KERAS-ARCHITECTURE` | info | Fixed-width NumPy array / Keras config with no Lambda layers |
+| `SAFETENSORS-FORMAT` / `GGUF-FORMAT` | info | Valid header for a data-only format that cannot execute code on load |
+| `NPY-UNPARSEABLE` / `KERAS-UNPARSEABLE` / `SAFETENSORS-INVALID` / `GGUF-INVALID` | low | Artifact whose header does not conform to the format it claims to be |
+
+How the analysis works, the container policy, and each format check's
+limits: [docs/FORMATS-AND-DEPTH.md](docs/FORMATS-AND-DEPTH.md).
 
 ## Real-life use case
 
@@ -150,7 +175,7 @@ Pipelines, Jenkins, or any runner with Python 3.9+:
 Or call the PyPI package directly:
 
 ```bash
-python -m pip install "pickle-sentry==0.2.1"
+python -m pip install "pickle-sentry==0.3.0"
 pickle-sentry . --fail-on high
 ```
 

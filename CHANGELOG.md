@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.3.0 — 2026-11-10
+
+Depth and formats release: the pickle inspector is now an abstract
+interpreter, and four non-pickle artifact formats are checked natively.
+
+- VM-tracking pickle analysis: a symbolic stack over `pickletools`
+  disassembly resolves which callables a pickle *actually invokes* via
+  REDUCE / NEWOBJ / NEWOBJ_EX / INST / OBJ, tracking values through the
+  memo (PUT/GET) and STACK_GLOBAL. This defeats the memo evasion (callable
+  stored with BINPUT, fetched with BINGET at REDUCE time) and makes the
+  invocation rules precise: a dangerous global that is merely referenced
+  is reported as `PICKLE-DANGEROUS-GLOBAL`, never as an invocation.
+- Nested pickles: pickle streams embedded in bytes constants are analysed
+  recursively (depth-capped) and merged into the parent's findings.
+- Container peeling before raw analysis (depth-capped): gzip, bzip2, xz,
+  and zlib wrappers are decompressed; zip and tar members that look like
+  pickle streams are inspected (extending the existing torch-zip
+  behaviour). 7-Zip archives cannot be read with the standard library and
+  are flagged `PICKLE-CONTAINER-OPAQUE` (high) — the opaque-container
+  route used by the NullifAI Hub-scanner evasion.
+- New rule `PICKLE-UNPARSEABLE` (medium) for streams that yield no valid
+  opcodes; parseable benign pickles still get `PICKLE-FILE-PRESENT`.
+- New formats: `.npy` object arrays have their pickle payload analysed
+  (fixed-width arrays are info-level `NPY-DATA-ARRAY`); `.npz` members are
+  checked per-file; `.keras` configs are checked for marshal-loading
+  Lambda layers (`KERAS-LAMBDA-LAYER`, high); `.safetensors` and `.gguf`
+  get header-level info checks (`SAFETENSORS-FORMAT`, `GGUF-FORMAT`).
+- Hub mode now also downloads and inspects `.npy`, `.npz`, `.keras`, and
+  `.gguf` files under the same size cap. `.safetensors` is not downloaded
+  in Hub mode (too large for a header check).
+- See `docs/FORMATS-AND-DEPTH.md` for how the analysis works and its
+  limits. Zero dependencies, as always.
+
 ## 0.2.1 — 2026-11-10
 
 Adoption and CI/CD release. No scanner-rule changes.

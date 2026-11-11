@@ -12,6 +12,7 @@ from .scanner import scan_python_file
 
 SKIP_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", ".tox", ".mypy_cache"}
 PICKLE_EXTS = {".pkl", ".pickle", ".joblib", ".pt", ".pth"}
+ARTIFACT_EXTS = {".npy", ".npz", ".keras", ".safetensors", ".gguf"}
 
 
 def collect(root: str, exclude: list[str] | None = None) -> ScanResult:
@@ -32,7 +33,7 @@ def collect(root: str, exclude: list[str] | None = None) -> ScanResult:
         if ext == ".py":
             result.files_scanned += 1
             result.findings.extend(scan_python_file(p))
-        elif ext in PICKLE_EXTS:
+        elif ext in PICKLE_EXTS or ext in ARTIFACT_EXTS:
             result.pickle_files_inspected += 1
             result.findings.extend(inspect_file(p))
     return result

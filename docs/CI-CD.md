@@ -18,7 +18,7 @@ or `--fail-on none` when generating a report without failing that step.
 Pin the version in real pipelines so a scan is reproducible:
 
 ```bash
-python -m pip install "pickle-sentry==0.2.1"
+python -m pip install "pickle-sentry==0.3.0"
 pickle-sentry . --fail-on high
 ```
 
@@ -28,7 +28,7 @@ To scan a third-party package before it is installed or promoted, download
 its archive without installing it, extract it, and scan the extracted source:
 
 ```bash
-python -m pip install "pickle-sentry==0.2.1"
+python -m pip install "pickle-sentry==0.3.0"
 python -m pip download --no-deps --dest package "datasets==5.1.0"
 python -m zipfile -e package/datasets-5.1.0-py3-none-any.whl extracted
 pickle-sentry extracted --format json \
@@ -83,7 +83,7 @@ checkout. Its inputs are:
 | `format` | `text` | `text`, `json`, or `sarif` |
 | `output` | empty | Write the report to this file |
 | `exclude` | empty | Comma-separated path substrings to skip |
-| `version` | `0.2.1` | PyPI version to install |
+| `version` | `0.3.0` | PyPI version to install |
 | `python-version` | `3.12` | Python version used by the Action |
 
 ### GitHub code scanning with SARIF
@@ -142,7 +142,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install "pickle-sentry==0.2.1"
+      - run: python -m pip install "pickle-sentry==0.3.0"
       - run: pickle-sentry . --fail-on high --exclude /tests/
 ```
 
@@ -152,7 +152,7 @@ jobs:
 pickle-sentry:
   image: python:3.12-slim
   script:
-    - python -m pip install "pickle-sentry==0.2.1"
+    - python -m pip install "pickle-sentry==0.3.0"
     - pickle-sentry . --fail-on high --format json --output pickle-sentry.json
   artifacts:
     when: always
@@ -174,7 +174,7 @@ steps:
     inputs:
       versionSpec: "3.12"
   - script: |
-      python -m pip install "pickle-sentry==0.2.1"
+      python -m pip install "pickle-sentry==0.3.0"
       pickle-sentry . --fail-on high
     displayName: "Run pickle-sentry"
 ```
@@ -184,7 +184,7 @@ steps:
 Any runner with Python 3.9 or newer can call the same executable:
 
 ```bash
-python -m pip install "pickle-sentry==0.2.1"
+python -m pip install "pickle-sentry==0.3.0"
 pickle-sentry . --fail-on high
 ```
 
@@ -204,7 +204,7 @@ already in the checkout. For example, run this as a scheduled job or before a
 training job consumes the dependency:
 
 ```bash
-python -m pip install "pickle-sentry==0.2.1"
+python -m pip install "pickle-sentry==0.3.0"
 pickle-sentry hub organisation/dataset-name --fail-on high
 pickle-sentry hub organisation/model-name --repo-type model --fail-on high
 ```

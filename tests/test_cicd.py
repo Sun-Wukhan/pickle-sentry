@@ -11,7 +11,7 @@ def read(relative_path):
 def test_github_action_installs_pinned_pypi_release():
     action = read("action.yml")
 
-    assert 'default: "0.2.1"' in action
+    assert 'default: "0.3.0"' in action
     assert 'pickle-sentry==${PICKLE_SENTRY_VERSION}' in action
     assert "git+https://github.com/Sun-Wukhan/pickle-sentry" not in action
     for input_name in ("path:", "fail-on:", "format:", "output:", "exclude:", "version:"):
@@ -22,9 +22,9 @@ def test_cicd_examples_call_the_released_package_or_action():
     expected = {
         "examples/cicd/github-actions.yml": "uses: Sun-Wukhan/pickle-sentry@main",
         "examples/cicd/github-actions-sarif.yml": "github/codeql-action/upload-sarif@v3",
-        "examples/cicd/gitlab-ci.yml": 'pickle-sentry==0.2.1',
-        "examples/cicd/azure-pipelines.yml": 'pickle-sentry==0.2.1',
-        "examples/cicd/Jenkinsfile": 'pickle-sentry==0.2.1',
+        "examples/cicd/gitlab-ci.yml": 'pickle-sentry==0.3.0',
+        "examples/cicd/azure-pipelines.yml": 'pickle-sentry==0.3.0',
+        "examples/cicd/Jenkinsfile": 'pickle-sentry==0.3.0',
         "examples/cicd/github-actions-scan-existing-package.yml": "datasets==5.1.0",
         "examples/cicd/scan-existing-package.sh": "pip download --no-deps",
     }
@@ -39,7 +39,7 @@ def test_cicd_document_explains_exit_code_contract():
     assert "## Exit-code contract" in guide
     assert "No finding reached the selected `--fail-on` threshold" in guide
     assert "At least one finding reached the selected `--fail-on` threshold" in guide
-    assert 'pickle-sentry==0.2.1' in guide
+    assert 'pickle-sentry==0.3.0' in guide
 
 
 def test_existing_package_example_records_the_real_datasets_result():

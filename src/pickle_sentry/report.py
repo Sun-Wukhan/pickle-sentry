@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from . import __version__
 from .model import ScanResult, SEVERITY_ORDER
 
 _ICON = {"critical": "CRITICAL", "high": "HIGH", "medium": "MEDIUM", "low": "LOW", "info": "INFO"}
@@ -34,7 +35,7 @@ def to_json(result: ScanResult) -> str:
 
 def to_sarif(result: ScanResult) -> str:
     runs = [{
-        "tool": {"driver": {"name": "pickle-sentry", "version": "0.2.1",
+        "tool": {"driver": {"name": "pickle-sentry", "version": __version__,
                             "informationUri": "https://github.com/Sun-Wukhan/pickle-sentry"}},
         "results": [
             {

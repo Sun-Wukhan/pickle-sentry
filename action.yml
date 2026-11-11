@@ -28,7 +28,7 @@ inputs:
   version:
     description: pickle-sentry version to install from PyPI
     required: false
-    default: "0.2.1"
+    default: "0.3.0"
   python-version:
     description: Python version used to run pickle-sentry
     required: false
