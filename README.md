@@ -10,15 +10,15 @@
 Scan code and dataset files for unsafe pickle deserialization — including the
 Hugging Face `datasets` pandas builder RCE, **CVE-2026-57845** (CVSS 8.8).
 
-Pickle is code, not data. Any file, checkpoint, or dataset that passes through
-a pickle loader executes whatever its author put in it. `pickle-sentry` finds
-those paths in your code, and inspects pickle files by *disassembly only* —
-**it never executes the files it inspects** (its test suite proves this with a
-canary payload).
+Pickle is code, not data. pickle-sentry finds unsafe pickle loaders in your code and inspects pickle files by disassembly only. It **never executes the files it inspects**, and its test suite proves that with a canary payload that would fire on any execution.
 
 ![pickle-sentry demo](docs/assets/demo.svg)
 
 Full walkthrough: [docs/DEMO.md](docs/DEMO.md).
+
+[![Release](https://img.shields.io/github/v/release/Sun-Wukhan/pickle-sentry)](https://github.com/Sun-Wukhan/pickle-sentry/releases)
+
+If pickle-sentry saved you from loading an untrusted dataset or checkpoint, a star helps other ML teams find it before they load one.
 
 ## Quick start
 
