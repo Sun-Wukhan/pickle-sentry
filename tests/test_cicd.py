@@ -11,7 +11,7 @@ def read(relative_path):
 def test_github_action_installs_pinned_pypi_release():
     action = read("action.yml")
 
-    assert 'default: "0.3.0"' in action
+    assert 'default: "0.3.1"' in action
     assert 'pickle-sentry==${PICKLE_SENTRY_VERSION}' in action
     assert "git+https://github.com/Sun-Wukhan/pickle-sentry" not in action
     for input_name in ("path:", "fail-on:", "format:", "output:", "exclude:", "version:"):

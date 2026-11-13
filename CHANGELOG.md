@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1 — 2026-11-13
+
+Metadata-only release. No scanner behaviour changes.
+
+- Adds PyPI trove classifiers (Python 3.9–3.13) to the package metadata
+  so the Python versions badge renders correctly.
+- GitHub Action default `version` input bumped to 0.3.1.
+- README action examples pinned to `Sun-Wukhan/pickle-sentry@v0.3.1`.
+- SECURITY.md supported versions corrected to 0.3.x.
+
 ## 0.3.0 — 2026-11-10
 
 Depth and formats release: the pickle inspector is now an abstract

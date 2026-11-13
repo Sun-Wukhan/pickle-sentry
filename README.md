@@ -157,7 +157,7 @@ honest limits in [docs/LIVE-EXAMPLES.md](docs/LIVE-EXAMPLES.md):
   datasets.
 
 Also included: a composite **GitHub Action** (`action.yml`, use it as
-`uses: Sun-Wukhan/pickle-sentry@main`) and a **pre-commit hook**
+`uses: Sun-Wukhan/pickle-sentry@v0.3.1`) and a **pre-commit hook**
 (`.pre-commit-hooks.yaml`). Use `--exclude /tests/` to cut test-fixture noise.
 
 ## CI/CD
@@ -166,7 +166,7 @@ Call pickle-sentry as a pipeline gate in GitHub Actions, GitLab CI, Azure
 Pipelines, Jenkins, or any runner with Python 3.9+:
 
 ```yaml
-- uses: Sun-Wukhan/pickle-sentry@main
+- uses: Sun-Wukhan/pickle-sentry@v0.3.1
   with:
     path: .
     fail-on: high
@@ -175,7 +175,7 @@ Pipelines, Jenkins, or any runner with Python 3.9+:
 Or call the PyPI package directly:
 
 ```bash
-python -m pip install "pickle-sentry==0.3.0"
+python -m pip install "pickle-sentry==0.3.1"
 pickle-sentry . --fail-on high
 ```
 

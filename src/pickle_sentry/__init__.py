@@ -1,3 +1,3 @@
 """pickle-sentry: scan for unsafe pickle deserialization. Never executes inspected files."""
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
