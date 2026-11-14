@@ -11,7 +11,7 @@ import urllib.request
 import urllib.error
 
 from . import __version__
-from .inspector import inspect_bytes
+from .inspector import DEFAULT_LIMITS, InspectionLimits, inspect_bytes
 from .model import Finding, ScanResult
 from .scanner import scan_python_source
 
@@ -23,6 +23,7 @@ ARTIFACT_EXTS = {".npy", ".npz", ".keras", ".gguf"}
 # Model weights in classic PyTorch format are pickle zip archives.
 MODEL_PICKLE_NAMES = {"pytorch_model.bin"}
 DEFAULT_MAX_BYTES = 64 * 1024 * 1024  # per file
+DEFAULT_MAX_TOTAL_BYTES = 512 * 1024 * 1024  # per repo scan, all downloads
 
 
 def _default_fetch(url: str) -> bytes:
@@ -46,9 +47,23 @@ def _resolve_base(repo_id: str, repo_type: str, revision: str) -> str:
 
 
 def scan_hub_repo(repo_id: str, repo_type: str = "dataset", revision: str = "main",
-                  max_bytes: int = DEFAULT_MAX_BYTES, fetch=None) -> ScanResult:
+                  max_bytes: int = DEFAULT_MAX_BYTES,
+                  max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
+                  limits: InspectionLimits = DEFAULT_LIMITS,
+                  fetch=None) -> ScanResult:
+    """Scan one Hub repo under two download limits.
+
+    max_bytes caps any single file (oversize files are flagged, never
+    downloaded). max_total_bytes caps the cumulative bytes downloaded for
+    pickle/artifact inspection across the whole repo: once the budget is
+    committed, remaining pickle-family files are reported with
+    HUB-PICKLE-SKIPPED-BUDGET instead of being downloaded, and counted in
+    result.files_skipped_budget. Python sources are small; their bytes are
+    counted toward the budget after download but are not gated by it.
+    """
     fetch = fetch or _default_fetch
     result = ScanResult(root=f"hub://{repo_type}/{repo_id}@{revision}")
+    spent = 0  # bytes downloaded so far for this repo scan
     try:
         info = json.loads(fetch(_api_base(repo_type) + repo_id))
     except (urllib.error.URLError, ValueError) as exc:
@@ -75,19 +90,35 @@ def scan_hub_repo(repo_id: str, repo_type: str = "dataset", revision: str = "mai
                     "Inspect it locally before trusting it.",
                     cve="CVE-2026-57845"))
                 continue
+            if spent >= max_total_bytes or (size is not None
+                                            and spent + size > max_total_bytes):
+                result.files_skipped_budget += 1
+                size_note = (f"this file is {size/1e6:.1f} MB" if size is not None
+                             else "its size is not reported by the Hub API")
+                result.findings.append(Finding(
+                    "HUB-PICKLE-SKIPPED-BUDGET", "low", display, None,
+                    f"File was NOT downloaded: the scan's total download budget "
+                    f"of {max_total_bytes/1e6:.0f} MB was reached "
+                    f"({spent/1e6:.1f} MB already downloaded; {size_note}; "
+                    f"{result.files_skipped_budget} file(s) skipped for budget "
+                    "so far). Inspect it locally before trusting it."))
+                continue
             try:
                 data = fetch(base + urllib.request.quote(name))
             except urllib.error.URLError as exc:
                 result.findings.append(Finding("HUB-DOWNLOAD-FAILED", "low", display, None,
                                                f"Could not download for inspection: {exc}"))
                 continue
-            result.findings.extend(inspect_bytes(data, display))
+            spent += len(data)
+            result.findings.extend(inspect_bytes(data, display, limits))
         elif ext == ".py":
             result.files_scanned += 1
             try:
-                source = fetch(base + urllib.request.quote(name)).decode("utf-8", "replace")
+                raw = fetch(base + urllib.request.quote(name))
             except urllib.error.URLError:
                 continue
+            spent += len(raw)
+            source = raw.decode("utf-8", "replace")
             result.findings.extend(scan_python_source(source, display))
     if not siblings:
         result.findings.append(Finding("HUB-EMPTY", "info", result.root, None,

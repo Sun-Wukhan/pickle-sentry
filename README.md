@@ -86,7 +86,9 @@ Lists the repo's files via the Hub API, downloads pickle-family files
 and model artifacts (`.npy`, `.npz`, `.keras`, `.gguf`) and inspects them by
 disassembly — including the pickle stream inside torch zip archives — and
 AST-scans any Python files in the repo. Files over the size cap are flagged,
-not downloaded. `.safetensors` files are not downloaded in Hub mode (too
+not downloaded, and downloads stop at a total budget (`--max-total-mb`,
+default 512 MB per repo) with the remaining files reported rather than
+fetched. `.safetensors` files are not downloaded in Hub mode (too
 large for a header check; scan them locally). Set `HF_TOKEN` for private
 repos. Nothing downloaded is ever executed.
 
@@ -121,6 +123,9 @@ members of zip and tar archives.
 | `PICKLE-CONTAINER-OPAQUE` | high | 7-Zip archive: contents cannot be inspected with the standard library (the NullifAI evasion route) — extract and scan the contents |
 | `PICKLE-FILE-PRESENT` | medium | Any other `.pkl` / `.pickle` / `.joblib` file, and pickle streams inside torch `.pt`/`.pth` zip archives |
 | `PICKLE-UNPARSEABLE` | medium | A stream that yields no valid pickle opcodes (corrupt, truncated, or not a pickle) |
+| `SCAN-OPCODE-LIMIT` | low | Disassembly stopped at the opcode ceiling (`--max-opcodes`, default 2,000,000): the stream was inspected only partially |
+| `SCAN-ARCHIVE-LIMIT` | low | Archive entries or a compression wrapper exceeded the size / ratio / inflation caps and were not inflated: that content was not inspected |
+| `HUB-PICKLE-SKIPPED-BUDGET` | low | Hub mode only: the file was not downloaded because the scan's total download budget (`--max-total-mb`, default 512) was reached |
 
 **In other model artifacts (new in 0.3.0):**
 
@@ -134,6 +139,29 @@ members of zip and tar archives.
 
 How the analysis works, the container policy, and each format check's
 limits: [docs/FORMATS-AND-DEPTH.md](docs/FORMATS-AND-DEPTH.md).
+
+## What a clean scan does not mean
+
+A pickle-sentry scan is a heuristic over a disassembly. It flags the risk
+shapes it knows how to see; a clean result is **not** proof that an
+artifact is safe, and it is not a certificate for the file.
+
+- Constructs and formats outside the modelled set are reported as
+  uninspected or partial (a truncated stream, an archive entry skipped for
+  its size, a 7-Zip container), never silently passed — but a format the
+  scanner does not know at all gets no such label. Check the report's
+  partial and limit findings before treating a file as cleared.
+- The scanner says what a file would do if loaded, not who produced it.
+  Provenance — signing, hashes from a trusted channel, publisher
+  verification — is a separate question this tool does not answer.
+- If a file must be loaded and its provenance is not established, load it
+  in a sandbox with least privilege anyway. A scan reduces risk before
+  that decision; it complements provenance and sandboxing, it does not
+  replace either.
+
+The evidence behind the detection claims, including a known-payload
+corpus and a scan of the 40 most downloaded Hugging Face models:
+[docs/COVERAGE.md](docs/COVERAGE.md).
 
 ## Real-life use case
 
@@ -157,7 +185,7 @@ honest limits in [docs/LIVE-EXAMPLES.md](docs/LIVE-EXAMPLES.md):
   datasets.
 
 Also included: a composite **GitHub Action** (`action.yml`, use it as
-`uses: Sun-Wukhan/pickle-sentry@v0.3.1`) and a **pre-commit hook**
+`uses: Sun-Wukhan/pickle-sentry@v0.4.0`) and a **pre-commit hook**
 (`.pre-commit-hooks.yaml`). Use `--exclude /tests/` to cut test-fixture noise.
 
 ## CI/CD
@@ -166,7 +194,7 @@ Call pickle-sentry as a pipeline gate in GitHub Actions, GitLab CI, Azure
 Pipelines, Jenkins, or any runner with Python 3.9+:
 
 ```yaml
-- uses: Sun-Wukhan/pickle-sentry@v0.3.1
+- uses: Sun-Wukhan/pickle-sentry@v0.4.0
   with:
     path: .
     fail-on: high
@@ -175,7 +203,7 @@ Pipelines, Jenkins, or any runner with Python 3.9+:
 Or call the PyPI package directly:
 
 ```bash
-python -m pip install "pickle-sentry==0.3.1"
+python -m pip install "pickle-sentry==0.4.0"
 pickle-sentry . --fail-on high
 ```
 
@@ -215,7 +243,10 @@ pytest
 
 The inspector tests build a real malicious pickle (`__reduce__` → `os.system`)
 and assert two things: it is flagged critical, and the payload's canary file
-**never appears** — i.e. inspection did not execute it.
+**never appears** — i.e. inspection did not execute it. A separate hostile
+corpus (`tests/test_hostile.py`) feeds the scanner zip bombs, opcode floods,
+truncated streams, and lying headers, and asserts every scan stays bounded
+and labelled.
 
 ## Licence
 

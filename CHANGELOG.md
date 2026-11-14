@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.4.0 — 2026-11-14
+
+Hardening and coverage release: inspection is now explicitly bounded on
+hostile input, and the detection evidence is written down.
+
+- Explicit resource limits, each reported rather than silent:
+  - Per-stream opcode ceiling in the pickle inspector (new `--max-opcodes`,
+    default 2,000,000). A stream past the ceiling stops being disassembled
+    and is reported partial with the new rule `SCAN-OPCODE-LIMIT` (low).
+  - Archive inflation caps: zip/tar entries are judged by declared
+    uncompressed size and compression ratio before inflation, every read is
+    hard-capped, and compression wrappers (gzip/bzip2/xz/zlib) decompress
+    through a capped streaming read. Skipped or capped content is reported
+    with the new rule `SCAN-ARCHIVE-LIMIT` (low); a decompression bomb can
+    no longer be materialised in memory. The same caps apply to `.npz` and
+    `.keras` archives.
+  - Hub mode total download budget (new `--max-total-mb`, default 512):
+    files past the budget are reported with the new rule
+    `HUB-PICKLE-SKIPPED-BUDGET` (low) instead of being downloaded, and the
+    report counts them (`files_skipped_budget`).
+- Hostile-input test corpus (`tests/test_hostile.py`, all fixtures
+  generated in-test): zip bomb, gzip bomb, truncated pickle, opcode flood,
+  self-referential and deeply nested graph bombs, lying length headers,
+  plus a canary test that a hostile REDUCE payload is flagged, never
+  executed. 79 tests total.
+- New `docs/COVERAGE.md`: the method, a known-payload corpus with expected
+  versus actual results (including the published CVE-2026-57845 PoC and
+  the `datasets==5.1.0` wheel), a field scan of the top 40 Hugging Face
+  models by downloads (26 fully scanned, 13 still shipping live pickle,
+  102 findings, 0 dangerous invocations), and what the scanner does not
+  prove.
+- README gains a "What a clean scan does not mean" section: a clean result
+  is heuristic evidence, not proof of safety, and complements rather than
+  replaces provenance checks and sandboxing.
+
 ## 0.3.1 — 2026-11-13
 
 Metadata-only release. No scanner behaviour changes.

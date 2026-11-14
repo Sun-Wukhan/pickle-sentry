@@ -20,7 +20,9 @@ import os
 import struct
 import zipfile
 
-from .inspector import inspect_pickle_bytes
+from .inspector import (DEFAULT_LIMITS, InspectionLimits, archive_limit_finding,
+                        inspect_pickle_bytes, read_zip_entry,
+                        zip_entry_skip_reason)
 from .model import Finding
 
 
@@ -40,7 +42,8 @@ def _descr_is_object(descr) -> bool:
     return False
 
 
-def _inspect_npy(data: bytes, path: str) -> list[Finding]:
+def _inspect_npy(data: bytes, path: str,
+                 limits: InspectionLimits = DEFAULT_LIMITS) -> list[Finding]:
     unparseable = Finding(
         "NPY-UNPARSEABLE", "low", path, None,
         "NumPy .npy file whose header could not be parsed; the file was not "
@@ -64,14 +67,15 @@ def _inspect_npy(data: bytes, path: str) -> list[Finding]:
 
     if _descr_is_object(descr):
         payload = data[header_start + header_len:]
-        return inspect_pickle_bytes(payload, f"{path}!npy-payload")
+        return inspect_pickle_bytes(payload, f"{path}!npy-payload", limits)
     return [Finding(
         "NPY-DATA-ARRAY", "info", path, None,
         f"NumPy data array (dtype {descr!r}, shape {shape}): fixed-width data "
         "only — no object payload, nothing executable to inspect.")]
 
 
-def _inspect_npz(data: bytes, path: str) -> list[Finding]:
+def _inspect_npz(data: bytes, path: str,
+                 limits: InspectionLimits = DEFAULT_LIMITS) -> list[Finding]:
     try:
         zf = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
@@ -80,15 +84,28 @@ def _inspect_npz(data: bytes, path: str) -> list[Finding]:
             "NumPy .npz file that is not a readable zip archive; it was not "
             "inspected further and should be treated as untrusted.")]
     findings: list[Finding] = []
+    skipped = []
     with zf:
-        for name in zf.namelist():
-            if not name.lower().endswith(".npy"):
+        for info in zf.infolist():
+            if not info.filename.lower().endswith(".npy"):
+                continue
+            reason = zip_entry_skip_reason(info, limits)
+            if reason is not None:
+                skipped.append((info.filename, reason))
                 continue
             try:
-                member = zf.read(name)
+                member = read_zip_entry(zf, info, limits)
             except Exception:
                 continue
-            findings.extend(_inspect_npy(member, f"{path}!{name}"))
+            if member is None:
+                skipped.append((info.filename,
+                                 "entry grew past the "
+                                 f"{limits.max_archive_entry_bytes}-byte "
+                                 "per-entry cap while being inflated"))
+                continue
+            findings.extend(_inspect_npy(member, f"{path}!{info.filename}", limits))
+    if skipped:
+        findings.append(archive_limit_finding(path, skipped))
     return findings
 
 
@@ -108,7 +125,8 @@ def _find_lambda_layers(node, trail: str, out: list) -> None:
             _find_lambda_layers(value, f"{trail}[{index}]", out)
 
 
-def _inspect_keras(data: bytes, path: str) -> list[Finding]:
+def _inspect_keras(data: bytes, path: str,
+                   limits: InspectionLimits = DEFAULT_LIMITS) -> list[Finding]:
     try:
         zf = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
@@ -119,23 +137,39 @@ def _inspect_keras(data: bytes, path: str) -> list[Finding]:
     config = None
     config_error = False
     pickle_members: list = []
+    skipped: list = []
     with zf:
-        names = zf.namelist()
+        infos = {info.filename: info for info in zf.infolist()}
+        names = list(infos)
         config_name = next((n for n in names
                             if n == "config.json" or n.endswith("/config.json")), None)
         if config_name is None:
             config_error = True
         else:
             try:
-                config = json.loads(zf.read(config_name).decode("utf-8"))
+                raw_config = read_zip_entry(zf, infos[config_name], limits)
+                if raw_config is None:
+                    raise ValueError("config.json exceeds the per-entry cap")
+                config = json.loads(raw_config.decode("utf-8"))
             except Exception:
                 config_error = True
         for name in names:
             if name.lower().endswith(".pkl"):
+                reason = zip_entry_skip_reason(infos[name], limits)
+                if reason is not None:
+                    skipped.append((name, reason))
+                    continue
                 try:
-                    pickle_members.append((name, zf.read(name)))
+                    member = read_zip_entry(zf, infos[name], limits)
                 except Exception:
                     continue
+                if member is None:
+                    skipped.append((name,
+                                     "entry grew past the "
+                                     f"{limits.max_archive_entry_bytes}-byte "
+                                     "per-entry cap while being inflated"))
+                    continue
+                pickle_members.append((name, member))
 
     findings: list[Finding] = []
     lambdas: list = []
@@ -150,7 +184,9 @@ def _inspect_keras(data: bytes, path: str) -> list[Finding]:
             f"Lambda layer found at {trail}.",
             evidence=evidence))
     for name, member in pickle_members:
-        findings.extend(inspect_pickle_bytes(member, f"{path}!{name}"))
+        findings.extend(inspect_pickle_bytes(member, f"{path}!{name}", limits))
+    if skipped:
+        findings.append(archive_limit_finding(path, skipped))
     if config_error:
         findings.append(Finding(
             "KERAS-UNPARSEABLE", "low", path, None,
@@ -227,15 +263,16 @@ def _inspect_gguf(data: bytes, path: str) -> list[Finding]:
 
 # ---------------------------------------------------------------------------
 
-def inspect_artifact_bytes(data: bytes, path: str) -> list[Finding]:
+def inspect_artifact_bytes(data: bytes, path: str,
+                           limits: InspectionLimits = DEFAULT_LIMITS) -> list[Finding]:
     """Inspect a non-pickle model artifact by extension; never executes it."""
     ext = os.path.splitext(path)[1].lower()
     if ext == ".npy":
-        return _inspect_npy(data, path)
+        return _inspect_npy(data, path, limits)
     if ext == ".npz":
-        return _inspect_npz(data, path)
+        return _inspect_npz(data, path, limits)
     if ext == ".keras":
-        return _inspect_keras(data, path)
+        return _inspect_keras(data, path, limits)
     if ext == ".safetensors":
         return _inspect_safetensors(data, path)
     if ext == ".gguf":

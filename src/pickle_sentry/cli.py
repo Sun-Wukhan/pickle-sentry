@@ -5,7 +5,8 @@ import os
 import sys
 
 from . import __version__
-from .inspector import inspect_file
+from .inspector import (DEFAULT_LIMITS, DEFAULT_MAX_OPCODES, InspectionLimits,
+                        inspect_file)
 from .model import ScanResult
 from .report import to_json, to_sarif, to_text
 from .scanner import scan_python_file
@@ -15,7 +16,8 @@ PICKLE_EXTS = {".pkl", ".pickle", ".joblib", ".pt", ".pth"}
 ARTIFACT_EXTS = {".npy", ".npz", ".keras", ".safetensors", ".gguf"}
 
 
-def collect(root: str, exclude: list[str] | None = None) -> ScanResult:
+def collect(root: str, exclude: list[str] | None = None,
+            limits: InspectionLimits = DEFAULT_LIMITS) -> ScanResult:
     exclude = exclude or []
     result = ScanResult(root=root)
     paths: list[str] = []
@@ -35,7 +37,7 @@ def collect(root: str, exclude: list[str] | None = None) -> ScanResult:
             result.findings.extend(scan_python_file(p))
         elif ext in PICKLE_EXTS or ext in ARTIFACT_EXTS:
             result.pickle_files_inspected += 1
-            result.findings.extend(inspect_file(p))
+            result.findings.extend(inspect_file(p, limits))
     return result
 
 
@@ -50,13 +52,21 @@ def _hub_main(argv: list[str]) -> int:
     ap.add_argument("--revision", default="main")
     ap.add_argument("--max-size-mb", type=float, default=64.0,
                     help="Per-file inspection cap in MB (default: 64)")
+    ap.add_argument("--max-total-mb", type=float, default=512.0,
+                    help="Total download budget per repo scan in MB (default: 512). "
+                         "Files past the budget are reported, not downloaded.")
+    ap.add_argument("--max-opcodes", type=int, default=DEFAULT_MAX_OPCODES,
+                    help=f"Max pickle opcodes disassembled per stream "
+                         f"(default: {DEFAULT_MAX_OPCODES})")
     ap.add_argument("--format", choices=["text", "json", "sarif"], default="text")
     ap.add_argument("--output", help="Write the report to this file instead of stdout")
     ap.add_argument("--fail-on", choices=["critical", "high", "medium", "low", "none"],
                     default="high")
     args = ap.parse_args(argv)
     result = scan_hub_repo(args.repo_id, repo_type=args.repo_type, revision=args.revision,
-                           max_bytes=int(args.max_size_mb * 1024 * 1024))
+                           max_bytes=int(args.max_size_mb * 1024 * 1024),
+                           max_total_bytes=int(args.max_total_mb * 1024 * 1024),
+                           limits=InspectionLimits(max_opcodes=args.max_opcodes))
     rendered = {"text": to_text, "json": to_json, "sarif": to_sarif}[args.format](result)
     if args.output:
         with open(args.output, "w", encoding="utf-8") as fh:
@@ -82,6 +92,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="Exit 1 if any finding is at or above this severity (default: high)")
     ap.add_argument("--exclude", action="append", default=[],
                     help="Skip paths containing this substring (repeatable, e.g. --exclude /tests/)")
+    ap.add_argument("--max-opcodes", type=int, default=DEFAULT_MAX_OPCODES,
+                    help=f"Max pickle opcodes disassembled per stream "
+                         f"(default: {DEFAULT_MAX_OPCODES}); past the ceiling the "
+                         "stream is reported as partially inspected")
     ap.add_argument("--version", action="version", version=f"pickle-sentry {__version__}")
     args = ap.parse_args(argv)
 
@@ -89,7 +103,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: no such path: {args.path}", file=sys.stderr)
         return 2
 
-    result = collect(args.path, exclude=args.exclude)
+    result = collect(args.path, exclude=args.exclude,
+                     limits=InspectionLimits(max_opcodes=args.max_opcodes))
     rendered = {"text": to_text, "json": to_json, "sarif": to_sarif}[args.format](result)
     if args.output:
         with open(args.output, "w", encoding="utf-8") as fh:

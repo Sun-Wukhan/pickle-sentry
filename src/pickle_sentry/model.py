@@ -24,6 +24,7 @@ class ScanResult:
     root: str
     files_scanned: int = 0
     pickle_files_inspected: int = 0
+    files_skipped_budget: int = 0  # hub mode: files not downloaded, budget spent
     findings: list[Finding] = field(default_factory=list)
 
     @property
@@ -43,6 +44,7 @@ class ScanResult:
             "root": self.root,
             "files_scanned": self.files_scanned,
             "pickle_files_inspected": self.pickle_files_inspected,
+            "files_skipped_budget": self.files_skipped_budget,
             "max_severity": self.max_severity,
             "findings": [f.to_dict() for f in self.findings],
         }

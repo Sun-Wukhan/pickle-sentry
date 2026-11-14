@@ -13,6 +13,12 @@ def to_text(result: ScanResult) -> str:
         f"pickle-sentry scan: {result.root}",
         f"  python files scanned: {result.files_scanned}",
         f"  pickle files inspected (never executed): {result.pickle_files_inspected}",
+    ]
+    if result.files_skipped_budget:
+        lines.append(
+            f"  pickle files skipped (hub download budget reached): "
+            f"{result.files_skipped_budget}")
+    lines += [
         f"  findings: {len(result.findings)}"
         + (f" (max severity: {result.max_severity})" if result.max_severity else ""),
         "",
