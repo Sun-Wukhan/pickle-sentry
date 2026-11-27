@@ -110,6 +110,29 @@ models pickle only framework-standard classes, you will not see it; if
 they pickle your own classes, expect this rule and judge the callable
 yourself — the finding names it.
 
+## Re-run after the 0.4.1 routing fix (2026-11-26)
+
+0.4.1 fixed miss category 1 (standalone archives were never routed to
+the inspector) and added `.bin` routing plus magic-byte sniffing for
+files whose extension lies. Same corpus, same criteria, pickle-sentry
+column only:
+
+| pickle-sentry | Malicious caught | Benign falsely flagged |
+|---|---:|---:|
+| 0.4.0 | 71 / 96 | 5 / 24 |
+| 0.4.1 | **75 / 96** | 5 / 24 |
+
+Newly caught: `malicious1.zip` (critical), `malicious1_wrong_ext.zip`
+(critical, via sniffing), `malicious1.7z` (high, opaque container), and
+the GHSA-jgw4 `.bin` extension-disguise case (high). No regressions and
+no new false flags. The five remaining zip variants (encrypted,
+patched-data and strong-encryption flag tricks, tampered local header,
+bad CRC) now produce a medium `PICKLE-FILE-PRESENT` finding instead of
+silence — they are counted and reported, but the payload bytes cannot
+be inflated by the Python standard library, so they stay below the
+≥high catch criterion. Extracting them anyway would need a tolerant
+raw zip reader; that is future work, recorded here rather than hidden.
+
 ## Reproducing
 
 Clone the three repos at the versions above, copy their fixture files,

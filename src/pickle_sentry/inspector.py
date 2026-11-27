@@ -679,7 +679,7 @@ def _inspect_stream(data: bytes, path: str, depth: int,
                     "partial. The uncompressed stream is larger than what was "
                     "analysed."))
             return findings
-        if data[:4] == b"PK\x03\x04":
+        if data[:4] in (b"PK\x03\x04", b"PK\x05\x06"):
             zip_findings = _inspect_zip(data, path, depth, limits)
             if zip_findings is not None:
                 return zip_findings

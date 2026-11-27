@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.1 — 2026-11-26
+
+Routing fix: standalone archives handed to the scanner are now actually
+inspected. Found by the published benchmark (docs/BENCHMARK.md, miss
+category 1), where 8 of Picklescan's malicious fixtures - a zip, six zip
+variants and a 7z - received no findings at all because the CLI never
+routed their extensions to the inspector that already knows how to peel
+them.
+
+- `cli.collect()` now routes `.zip`, `.tar`, `.tgz`, `.gz`, `.bz2`, `.xz`
+  and `.7z` files to the inspector, and `.bin` joins the inspected set
+  (torch/Hugging Face `.bin` files are pickle streams or torch zips; hub
+  mode already inspected them). Routed archives count toward
+  `pickle_files_inspected` like every other inspected file.
+- Magic-byte sniffing for files whose extension routes nowhere: the first
+  512 bytes are checked for zip, 7z, gzip, bzip2, xz and tar signatures
+  and the pickle protocol marker, so a container hiding behind a wrong
+  extension (the benchmark's `malicious1_wrong_ext` shape) is inspected
+  instead of skipped.
+- The inspector's zip detection also accepts the empty-archive signature
+  (`PK\x05\x06`) alongside `PK\x03\x04`.
+- 15 new routing tests (tests/test_archive_routing.py), all fixtures
+  generated in-test, including a canary proving a hostile REDUCE payload
+  inside a zip is flagged, never executed. 94 tests total.
+
 ## 0.4.0 — 2026-11-14
 
 Hardening and coverage release: inspection is now explicitly bounded on

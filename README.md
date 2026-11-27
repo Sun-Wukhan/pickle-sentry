@@ -65,15 +65,18 @@ settings; full method, per-category misses and caveats in
 |---|---:|---:|
 | Picklescan 1.0.5 | 92 / 96 | 0 / 24 |
 | Fickling 0.1.13 | 86 / 96 | 8 / 24 |
+| pickle-sentry 0.4.1 | 75 / 96 | 5 / 24 |
 | pickle-sentry 0.4.0 | 71 / 96 | 5 / 24 |
 | ModelScan 0.8.8 | 29 / 96 | 0 / 24 |
 
 Short version: Picklescan leads on its own corpus, Fickling catches
 everything it can parse but flags a third of benign files, ModelScan's
-scope is model files rather than raw pickles, and pickle-sentry's 25
-misses are categorised in the benchmark doc — the largest single group
-(8) is standalone `.zip`/`.7z` files handed directly to the CLI, a
-known gap with a fix planned.
+scope is model files rather than raw pickles, and pickle-sentry's
+misses are categorised in the benchmark doc. The largest single group
+in 0.4.0 (8 standalone `.zip`/`.7z` files the CLI never inspected) was
+fixed in 0.4.1 — same corpus, 71 → 75, no new false flags; the five
+damaged/encrypted zip variants that remain sit at medium, documented
+in the benchmark's re-run section.
 
 ## Why now
 
@@ -207,7 +210,7 @@ honest limits in [docs/LIVE-EXAMPLES.md](docs/LIVE-EXAMPLES.md):
   datasets.
 
 Also included: a composite **GitHub Action** (`action.yml`, use it as
-`uses: Sun-Wukhan/pickle-sentry@v0.4.0`) and a **pre-commit hook**
+`uses: Sun-Wukhan/pickle-sentry@v0.4.1`) and a **pre-commit hook**
 (`.pre-commit-hooks.yaml`). Use `--exclude /tests/` to cut test-fixture noise.
 
 ## CI/CD
@@ -216,7 +219,7 @@ Call pickle-sentry as a pipeline gate in GitHub Actions, GitLab CI, Azure
 Pipelines, Jenkins, or any runner with Python 3.9+:
 
 ```yaml
-- uses: Sun-Wukhan/pickle-sentry@v0.4.0
+- uses: Sun-Wukhan/pickle-sentry@v0.4.1
   with:
     path: .
     fail-on: high
@@ -225,7 +228,7 @@ Pipelines, Jenkins, or any runner with Python 3.9+:
 Or call the PyPI package directly:
 
 ```bash
-python -m pip install "pickle-sentry==0.4.0"
+python -m pip install "pickle-sentry==0.4.1"
 pickle-sentry . --fail-on high
 ```
 

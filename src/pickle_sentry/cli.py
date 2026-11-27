@@ -11,9 +11,47 @@ from .model import ScanResult
 from .report import to_json, to_sarif, to_text
 from .scanner import scan_python_file
 
-SKIP_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", ".tox", ".mypy_cache"}
-PICKLE_EXTS = {".pkl", ".pickle", ".joblib", ".pt", ".pth"}
+SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules", ".tox", ".mypy_cache"}
+PICKLE_EXTS = {".pkl", ".pickle", ".joblib", ".pt", ".pth", ".bin"}
 ARTIFACT_EXTS = {".npy", ".npz", ".keras", ".safetensors", ".gguf"}
+# Container formats the inspector already knows how to peel (or, for 7z, to
+# flag as opaque). Routing by extension alone used to skip these entirely, so
+# a standalone malicious1.zip sitting next to the .pkl files was never even
+# counted. ".tgz" is listed for clarity; "x.tar.gz" splitexts to ".gz".
+ARCHIVE_EXTS = {".zip", ".tar", ".tgz", ".gz", ".bz2", ".xz", ".7z"}
+INSPECT_EXTS = PICKLE_EXTS | ARTIFACT_EXTS | ARCHIVE_EXTS
+
+_SNIFF_BYTES = 512  # tar's ustar marker sits at offset 257; 512 covers it
+_SEVEN_Z_MAGIC = b"7z\xbc\xaf'\x1c"
+
+
+def _sniff_inspectable(path: str) -> bool:
+    """Magic-byte check for files whose extension routes nowhere.
+
+    Catches containers and pickle streams hiding behind a wrong or unknown
+    extension (e.g. a zip named ``weights.txt``). Reads at most the first
+    512 bytes and never raises: an unreadable file is simply not sniffed.
+    """
+    try:
+        with open(path, "rb") as fh:
+            head = fh.read(_SNIFF_BYTES)
+    except OSError:
+        return False
+    if head[:4] in (b"PK\x03\x04", b"PK\x05\x06"):  # zip (incl. empty zip)
+        return True
+    if head[:6] == _SEVEN_Z_MAGIC:  # 7z
+        return True
+    if head[:2] == b"\x1f\x8b":  # gzip
+        return True
+    if head[:3] == b"BZh":  # bzip2
+        return True
+    if head[:6] == b"\xfd7zXZ\x00":  # xz
+        return True
+    if len(head) > 262 and head[257:262] == b"ustar":  # tar
+        return True
+    if head[:1] == b"\x80":  # pickle protocol marker (protocols 2+)
+        return True
+    return False
 
 
 def collect(root: str, exclude: list[str] | None = None,
@@ -35,7 +73,7 @@ def collect(root: str, exclude: list[str] | None = None,
         if ext == ".py":
             result.files_scanned += 1
             result.findings.extend(scan_python_file(p))
-        elif ext in PICKLE_EXTS or ext in ARTIFACT_EXTS:
+        elif ext in INSPECT_EXTS or _sniff_inspectable(p):
             result.pickle_files_inspected += 1
             result.findings.extend(inspect_file(p, limits))
     return result
