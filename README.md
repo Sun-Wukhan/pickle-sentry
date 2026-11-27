@@ -53,6 +53,28 @@ the two places the CVE-2026-57845 class of bug actually lives.
 Use pickle-sentry alongside a model-file scanner, not instead of one: it
 covers the loader and supply-chain surface they do not.
 
+## Benchmark (2026-11-26)
+
+Head-to-head on the malicious test fixtures the other scanners ship in
+their own repos (96 malicious, ~99% of them Picklescan's, including its
+GHSA bypass regression set; 24 benign). Static modes only, default
+settings; full method, per-category misses and caveats in
+[docs/BENCHMARK.md](docs/BENCHMARK.md).
+
+| Tool | Malicious caught | Benign falsely flagged |
+|---|---:|---:|
+| Picklescan 1.0.5 | 92 / 96 | 0 / 24 |
+| Fickling 0.1.13 | 86 / 96 | 8 / 24 |
+| pickle-sentry 0.4.0 | 71 / 96 | 5 / 24 |
+| ModelScan 0.8.8 | 29 / 96 | 0 / 24 |
+
+Short version: Picklescan leads on its own corpus, Fickling catches
+everything it can parse but flags a third of benign files, ModelScan's
+scope is model files rather than raw pickles, and pickle-sentry's 25
+misses are categorised in the benchmark doc — the largest single group
+(8) is standalone `.zip`/`.7z` files handed directly to the CLI, a
+known gap with a fix planned.
+
 ## Why now
 
 CVE-2026-57845 (published 23 Oct 2026): Hugging Face `datasets` through 5.1.0 —
