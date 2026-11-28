@@ -38,6 +38,23 @@ DANGEROUS_GLOBALS = {
     "ctypes.CDLL", "ctypes.cdll", "multiprocessing.Process",
 }
 
+# Command-execution-capable globals that look innocuous (GHSA-g38g-8gr9-h9xp
+# class, per Wiz's analysis): stdlib helpers that run a shell command, spawn a
+# pager subprocess, or open a command stream when *called*. They are only
+# dangerous on invocation, so they are judged in _judge against the invoked
+# set alone — a mere reference (GLOBAL / STACK_GLOBAL with no REDUCE /
+# NEWOBJ / INST call) must not be flagged high. Several live under otherwise
+# benign prefixes (uuid.*), which is exactly how they bypassed blocklists.
+INVOKED_DANGEROUS_GLOBALS = {
+    "uuid._get_command_stdout",
+    "_osx_support._read_output", "_osx_support._find_build_tool",
+    "_aix_support._read_cmd_output",
+    "_pyrepl.pager.pipe_pager", "_pyrepl.pager.tempfile_pager",
+    "imaplib.IMAP4_stream",
+    "test.support.script_helper.assert_python_ok",
+    "test.support.script_helper.assert_python_failure",
+}
+
 # Modules whose mere import inside a pickle is a strong smell.
 DANGEROUS_MODULES = {"os", "posix", "nt", "subprocess", "pty", "commands",
                       "socket", "shutil", "runpy", "ctypes"}
@@ -342,8 +359,11 @@ def _judge(analysis: _Analysis, path: str,
                              if g.split(".")[0] in DANGEROUS_MODULES
                              and g not in dangerous_invoked
                              and g not in dangerous_referenced})
+    invoked_dangerous = sorted({g for g in invoked
+                                if g in INVOKED_DANGEROUS_GLOBALS})
     unknown_invoked = sorted({g for g in invoked
                               if g not in DANGEROUS_GLOBALS
+                              and g not in INVOKED_DANGEROUS_GLOBALS
                               and not g.startswith(BENIGN_GLOBAL_PREFIXES)})
 
     findings: list[Finding] = []
@@ -371,6 +391,21 @@ def _judge(analysis: _Analysis, path: str,
             path=path, line=None,
             message=f"Pickle references dangerous callable(s): {', '.join(dangerous_referenced)}.",
             evidence=", ".join(dangerous_referenced),
+            cve="CVE-2026-57845",
+        ))
+
+    if invoked_dangerous:
+        findings.append(Finding(
+            rule_id="PICKLE-INVOKED-DANGEROUS-GLOBAL",
+            severity="critical",
+            path=path, line=None,
+            message=("Pickle invokes command-execution-capable global(s) via "
+                     f"REDUCE/NEWOBJ ({', '.join(invoked_dangerous)}). These "
+                     "stdlib helpers look innocuous but run commands when "
+                     "called (the GHSA-g38g-8gr9-h9xp bypass class). Loading "
+                     "this file executes code. Treat as malicious unless you "
+                     "created it yourself."),
+            evidence=", ".join(invoked_dangerous),
             cve="CVE-2026-57845",
         ))
 

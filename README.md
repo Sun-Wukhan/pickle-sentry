@@ -65,6 +65,7 @@ settings; full method, per-category misses and caveats in
 |---|---:|---:|
 | Picklescan 1.0.5 | 92 / 96 | 0 / 24 |
 | Fickling 0.1.13 | 86 / 96 | 8 / 24 |
+| pickle-sentry 0.5.0 | 76 / 96 | 5 / 24 |
 | pickle-sentry 0.4.1 | 75 / 96 | 5 / 24 |
 | pickle-sentry 0.4.0 | 71 / 96 | 5 / 24 |
 | ModelScan 0.8.8 | 29 / 96 | 0 / 24 |
@@ -143,6 +144,7 @@ members of zip and tar archives.
 | Rule | Severity | What |
 |---|---|---|
 | `PICKLE-DANGEROUS-REDUCE` | critical | Pickle invokes `os.system`, `subprocess.*`, `eval`, `exec`, etc. via `REDUCE`/`NEWOBJ` |
+| `PICKLE-INVOKED-DANGEROUS-GLOBAL` | critical | Pickle invokes a command-execution-capable stdlib global (`uuid._get_command_stdout`, `_osx_support.*`, `_pyrepl.pager.*`, `imaplib.IMAP4_stream`, …) via `REDUCE`/`NEWOBJ` — the GHSA-g38g-8gr9-h9xp class; a mere reference is not flagged |
 | `PICKLE-REDUCE-CALLABLE` | high | Pickle invokes a non-standard callable via `REDUCE`/`NEWOBJ` (the CVE PoC payload's shape) |
 | `PICKLE-DANGEROUS-GLOBAL` / `PICKLE-SUSPICIOUS-MODULE` | high/medium | Dangerous globals referenced but never invoked |
 | `PICKLE-CONTAINER-OPAQUE` | high | 7-Zip archive: contents cannot be inspected with the standard library (the NullifAI evasion route) — extract and scan the contents |
@@ -210,7 +212,7 @@ honest limits in [docs/LIVE-EXAMPLES.md](docs/LIVE-EXAMPLES.md):
   datasets.
 
 Also included: a composite **GitHub Action** (`action.yml`, use it as
-`uses: Sun-Wukhan/pickle-sentry@v0.4.1`) and a **pre-commit hook**
+`uses: Sun-Wukhan/pickle-sentry@v0.5.0`) and a **pre-commit hook**
 (`.pre-commit-hooks.yaml`). Use `--exclude /tests/` to cut test-fixture noise.
 
 ## CI/CD
@@ -219,7 +221,7 @@ Call pickle-sentry as a pipeline gate in GitHub Actions, GitLab CI, Azure
 Pipelines, Jenkins, or any runner with Python 3.9+:
 
 ```yaml
-- uses: Sun-Wukhan/pickle-sentry@v0.4.1
+- uses: Sun-Wukhan/pickle-sentry@v0.5.0
   with:
     path: .
     fail-on: high
@@ -228,7 +230,7 @@ Pipelines, Jenkins, or any runner with Python 3.9+:
 Or call the PyPI package directly:
 
 ```bash
-python -m pip install "pickle-sentry==0.4.1"
+python -m pip install "pickle-sentry==0.5.0"
 pickle-sentry . --fail-on high
 ```
 

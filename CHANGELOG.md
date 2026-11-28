@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.5.0 — 2026-11-27
+
+GHSA-class detection: innocuous-looking stdlib globals that execute
+commands when called are now flagged on invocation. Found by the
+published benchmark (docs/BENCHMARK.md, miss category 2), where payloads
+built on such globals scored medium only.
+
+- New rule `PICKLE-INVOKED-DANGEROUS-GLOBAL` (critical): the abstract
+  interpreter classifies a command-execution-capable global as dangerous
+  only when it is actually invoked via REDUCE / NEWOBJ / INST. The set
+  follows Wiz's analysis of GHSA-g38g-8gr9-h9xp: `uuid._get_command_stdout`,
+  `_osx_support._read_output`, `_osx_support._find_build_tool`,
+  `_aix_support._read_cmd_output`, `_pyrepl.pager.pipe_pager`,
+  `_pyrepl.pager.tempfile_pager`, `imaplib.IMAP4_stream`, and
+  `test.support.script_helper.assert_python_ok` /
+  `assert_python_failure`. This is invocation precision, not a bigger
+  blocklist: a pickle that merely references one of these globals
+  (GLOBAL / STACK_GLOBAL with no call) is NOT flagged high, and benign
+  neighbours such as `uuid.uuid4` stay unflagged.
+- 19 new tests (tests/test_invoked_dangerous.py), all payloads hand-built
+  byte strings that are never unpickled: for each target global, an
+  invoking payload is flagged critical and a referencing payload is not
+  flagged high, plus a STACK_GLOBAL variant and a canary proving an
+  invoking payload is flagged but never executed. 113 tests total.
+- Benchmark re-run on the same corpus (docs/BENCHMARK.md): 75 → 76 of 96
+  malicious caught, benign false flags unchanged at 5/24, zero
+  regressions. The one newly caught file is the `uuid` GHSA fixture —
+  the only corpus file this mechanism could newly catch, because `uuid.`
+  was previously swallowed by the benign-prefix list; the other five
+  GHSA-g38g fixtures were already flagged high and now flag critical
+  under the precise rule. The remaining GHSA misses invoke `torch.*` /
+  `numpy.*` globals, a different class, and the builtins stack-chain
+  PoC (callable assembled via `__import__` / `vars` / `dict.get`) is
+  still not modelled by the VM — both stated plainly in the benchmark
+  doc rather than tuned away.
+
 ## 0.4.1 — 2026-11-26
 
 Routing fix: standalone archives handed to the scanner are now actually

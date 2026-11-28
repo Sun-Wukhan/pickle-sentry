@@ -133,6 +133,56 @@ be inflated by the Python standard library, so they stay below the
 ≥high catch criterion. Extracting them anyway would need a tolerant
 raw zip reader; that is future work, recorded here rather than hidden.
 
+## Re-run after the 0.5.0 invoked-dangerous-global rule (2026-11-27)
+
+0.5.0 added `PICKLE-INVOKED-DANGEROUS-GLOBAL` (critical): a small set of
+command-execution-capable stdlib globals — the GHSA-g38g-8gr9-h9xp class
+from Wiz's analysis (`uuid._get_command_stdout`,
+`_osx_support._read_output`, `_osx_support._find_build_tool`,
+`_aix_support._read_cmd_output`, `_pyrepl.pager.pipe_pager`,
+`_pyrepl.pager.tempfile_pager`, `imaplib.IMAP4_stream`,
+`test.support.script_helper.assert_python_ok` /
+`assert_python_failure`) — is flagged only when a pickle actually
+*invokes* it via REDUCE / NEWOBJ / INST. A mere reference stays below
+high; that precision is covered by tests, including a canary proving an
+invoking payload is flagged but never executed. Same corpus, same
+criteria:
+
+| pickle-sentry | Malicious caught | Benign falsely flagged |
+|---|---:|---:|
+| 0.4.0 | 71 / 96 | 5 / 24 |
+| 0.4.1 | 75 / 96 | 5 / 24 |
+| 0.5.0 | **76 / 96** | 5 / 24 |
+
+Honest accounting of what the change did and did not do:
+
+- **Newly caught: exactly one file** —
+  `picklescan__GHSA-g38g-8gr9-h9xp-uuid.pkl`. It was the only corpus file
+  the rule could newly catch: `uuid.` sits in the benign-prefix list, so
+  the invocation previously produced no finding at all.
+- The other five GHSA-g38g fixtures (aix-support, osx-support, imaplib,
+  pyrepl-pager, test) were already flagged high in 0.4.1 by the generic
+  `PICKLE-REDUCE-CALLABLE` rule; they now flag critical under the precise
+  rule, with no tally change.
+- **Zero regressions and no new false flags**: per-file diff against the
+  0.4.1 results shows no file flipping flagged → clean, and the benign
+  false-flag set is the identical five files.
+- **Still missed (20)**: the five damaged/encrypted zip variants and the
+  five category-3 files from the original run (`bad_pytorch.pt`,
+  `malicious6`, `malicious17`, `malicious22`,
+  `sys_module_override_sploit.pkl`) remain medium, as do ten GHSA
+  fixtures that invoke `torch.*` / `numpy.*` globals — a different class
+  from the stdlib globals this release targeted, not caught by this
+  mechanism. The builtins stack-chain shape (a callable assembled via
+  `__import__` / `vars` / `dict.get`, as in
+  `sys_module_override_sploit.pkl`) is still not modelled by the VM;
+  that remains a stated limitation, not a silent one.
+- Picklescan (92/96) and ModelScan (29/96) reproduced their published
+  tallies exactly in this run. Fickling errored on every file this run
+  (its venv failed), so its column was not reproduced; per-file verdicts
+  for all tools are in `fixtures-results-050.json` alongside this run's
+  other outputs.
+
 ## Reproducing
 
 Clone the three repos at the versions above, copy their fixture files,

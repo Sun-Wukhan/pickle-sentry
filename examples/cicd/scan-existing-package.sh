@@ -7,7 +7,7 @@ set -euo pipefail
 PACKAGE_SPEC="${1:-datasets==5.1.0}"
 FAIL_ON="${2:-high}"
 
-python -m pip install "pickle-sentry==0.4.1"
+python -m pip install "pickle-sentry==0.5.0"
 
 rm -rf package extracted
 mkdir -p package extracted
